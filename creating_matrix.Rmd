@@ -1,0 +1,87 @@
+---
+title: "Clusteren_haaften"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+```
+
+```{r}
+TRIBES <- read.csv("/Users/nscheffe/Documents/git/DxGenealogy/Granulosa_haaften_TRIBES.csv", header=TRUE)
+TRIBES <- TRIBES[,c(1,2,3,6)]
+colnames(TRIBES) <- c("Sample1", "Sample2", "cM_TRIBES", "EstDegree_TRIBES")
+TRIBES$EstDegree_TRIBES[TRIBES$EstDegree_TRIBES=="PO"] <- 1
+TRIBES
+write.table(TRIBES, "TRIBES.tsv", sep = "\t", row.names = FALSE)
+```
+
+
+```{r}
+Somalier <- read.table("/Users/nscheffe/Documents/git/DxGenealogy/Granulosa_haaften_somalier.tsv", sep="\t")
+Somalier <- Somalier[,1:3]
+colnames(Somalier) <- c("Sample1", "Sample2", "Relatedness_somalier")
+Somalier
+```
+
+```{r}
+merged <- merge(Somalier, TRIBES, by=c("Sample1","Sample2"), all.x = TRUE )
+merged <- transform(merged, EstDegree_TRIBES = as.numeric(EstDegree_TRIBES))
+merged["EstDegree_TRIBES"][is.na(merged["EstDegree_TRIBES"])] <- 12     # If value is NA in TRIBES column, make value 99
+merged["cM_TRIBES"][is.na(merged["cM_TRIBES"])] <- 1 
+str(merged)
+merged
+write.table(merged, "merged.tsv", sep = "\t", row.names = FALSE)
+```
+
+```{r}
+samples <- c()
+for(i in merged$Sample1){
+    if(! i %in% samples){
+    samples <- c(samples, i)}
+  }
+samples <- c(samples, "GPCA041B1")
+samples
+```
+
+```{r}
+matrix <- matrix(1:64, nrow = 8, ncol = 8)
+matrix
+```
+
+```{r}
+matrix
+colnames(matrix) <- samples
+rownames(matrix) <- samples
+matrix
+```
+
+```{r}
+for(i in matrix){
+k <- arrayInd(i, dim(matrix))
+#print(i)
+names <- mapply(`[[`, dimnames(matrix), k)
+data <- subset(merged, (Sample1==names[1] & Sample2 ==names[2]) | (Sample2==names[1] & Sample1 == names[2]))
+if(length(data$Sample1)==0){
+          matrix[k[1],k[2]] <- 1
+        }else{
+          matrix[k[1],k[2]] <- data$cM_TRIBES
+        }
+if(names[1]==names[2]){
+          matrix[k[1], k[2]] <- 0}
+}
+
+```
+
+```{r}
+#matrix
+format(matrix, digits = 2)
+```
+
+
+
+```{r}
+plot(hclust(dist(matrix)))
+```
+
