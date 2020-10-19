@@ -1,0 +1,19 @@
+---
+title: "oefen_file"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+args<-commandArgs(TRUE)
+TRIBES <- read.csv(args[1], header=TRUE)
+TRIBES
+Somalier <- read.table(agrs[2], sep="\t")
+Somalier
+```
+
