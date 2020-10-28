@@ -65,11 +65,27 @@ if(names[1]==names[2]){
 #matrix
 format(matrix, digits = 2)
 matrix
-print(dist(matrix), method="average")
+print(dist(matrix), method="single")
 avg_cM <- (hclust(dist(matrix, method="manhattan"), method="single"))
 dendo <- as.dendrogram(avg_cM)
 dendo <- color_branches(dendo,4)
 dendo%>% set("branches_lwd", 3) %>% plot( edgePar=list(col=1, lwd=3), horiz=F,ylab="Distance") 
 title("Cluster dendogram based on cM TRIBES")
 mtext(text = "Sample", side = 1, line = 1, col = "black", adj = -.05)
+
+print(dist(matrix), method="average")
+avg_cM <- (hclust(dist(matrix, method="manhattan"), method="average"))
+dendo <- as.dendrogram(avg_cM)
+dendo <- color_branches(dendo,4)
+dendo%>% set("branches_lwd", 3) %>% plot( edgePar=list(col=1, lwd=3), horiz=F,ylab="Distance") 
+title("Cluster dendogram based on cM TRIBES")
+mtext(text = "Sample", side = 1, line = 1, col = "black", adj = -.1)
+
+print(dist(matrix), method="complete")
+avg_cM <- (hclust(dist(matrix, method="manhattan"), method="complete"))
+dendo <- as.dendrogram(avg_cM)
+dendo <- color_branches(dendo,4)
+dendo%>% set("branches_lwd", 3) %>% plot( edgePar=list(col=1, lwd=3), horiz=F,ylab="Distance") 
+title("Cluster dendogram based on cM TRIBES")
+mtext(text = "Sample", side = 1, line = 1, col = "black", adj = -.1)
 dev.off()
