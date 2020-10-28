@@ -1,3 +1,12 @@
+library(dendextend)
+library(igraph)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+
+pdf("pdf_output.pdf")
+grid.newpage()
+
 args<-commandArgs(TRUE)
 file <- read.csv(args[1], header=TRUE)
 file <- file[,c(1,2,3,6)]
@@ -55,6 +64,12 @@ if(names[1]==names[2]){
 
 #matrix
 format(matrix, digits = 2)
+matrix
 print(dist(matrix), method="average")
-avg_cM <- (hclust(dist(matrix), method="average"))
-
+avg_cM <- (hclust(dist(matrix, method="manhattan"), method="single"))
+dendo <- as.dendrogram(avg_cM)
+dendo <- color_branches(dendo,4)
+dendo%>% set("branches_lwd", 3) %>% plot( edgePar=list(col=1, lwd=3), horiz=F,ylab="Distance") 
+title("Cluster dendogram based on cM TRIBES")
+mtext(text = "Sample", side = 1, line = 1, col = "black", adj = -.05)
+dev.off()
