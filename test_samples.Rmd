@@ -1,0 +1,151 @@
+---
+title: "Test_samples"
+output: html_document
+---
+
+<!-- Load necessary packages -->
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2) # For plotting
+library(knitr)
+library(reshape2) # For transforming matrix to dataframe
+```
+
+<!-- Reading Somalier file -->
+```{r}
+args<-commandArgs(TRUE)
+somalier <- read.table(args[1], sep="\t") # Use pairs file
+somalier <- somalier[,1:3]  # Only keeping necessary columns
+colnames(somalier) <- c("Sample1","Sample2","relatedness")   # Set column names
+somalier  # Printing variable
+```
+<!-- Reading Tribes file -->
+```{r}
+tribes <- read.csv(args[2], header=TRUE)  # Read csv file 
+tribes <- tribes[,c(1,2,3,6)]   # Only keeping necessary columns
+# Change column names 
+colnames(tribes) <- c("Sample1", "Sample2", "TRIBES_cM", "TRIBES_EstDegree") 
+# Change value PO to 1
+tribes$TRIBES_EstDegree[tribes$TRIBES_EstDegree == "PO"] <- 1
+# Make Est_degree a numeric colomn
+tribes <- transform(tribes, TRIBES_EstDegree = as.numeric(TRIBES_EstDegree))  
+tribes  # Print value
+```
+
+<!-- Retrieve sample names -->
+```{r}
+samples <- unique(c(somalier$Sample1))  # Only keep unique values of column Sample1
+samples <- as.vector(t(samples))  # Make variable a vector
+samples
+samples_2 <- unique(c(somalier$Sample2))  # Only keep unique values of column Sample2
+samples_2
+samples_2 <- as.vector(t(samples_2))  # Make variable a vector
+merge <- c(samples, samples_2)  # Merge the 2 vectors
+merge
+samples <- unique(merge)  # Keep only unique values
+samples
+```
+
+<!-- Check how many samples file contains -->
+```{r}
+entries <- length(samples)  # Get length of variable samples
+entries   # Check if the amount of values in vector "unique" is correct.
+```
+
+<!-- Determine the size of the matrix to be made -->
+```{r}
+size_matrix <- (entries * entries)  # Determine size of matrix 
+size_matrix
+```
+
+<!-- Create matrix for Somalier and Tribes using function-->
+```{r}
+create_matrix <- function(size_matrix, entries){
+  matrix <- matrix(1:size_matrix, nrow=entries, ncol=entries)
+  rownames(matrix) <- samples  # Add rownames to matrix
+  colnames(matrix) <- samples  # Add column names to matrix
+  return(matrix)
+}
+
+# Make matrix for Somalier and Tribes
+somalier_matrix <- create_matrix(size_matrix, entries)
+tribes_matrix <- create_matrix(size_matrix, entries)
+
+```
+
+<!-- Fill the matrix for Somalier and Tribes using a function -->
+```{r}
+fill_matrix <- function(matrix, file, type, empty, same){
+  for(i in matrix){   # For value in matrix
+  k <- arrayInd(i, dim(matrix))   # Get position of rowname and column name, store value in k
+  # Get row name and columnname based on location 'k', store value in "names"
+  names <- mapply(`[[`, dimnames(matrix), k)
+  # Create subset where the sample names in names are the same as in dataframe file, where the sample names     are in the same row. 
+  # If no match is found, data is empty.
+  data <- subset(file, (Sample1==names[1] & Sample2 ==names[2]) | (Sample2==names[1] & Sample1 ==         names[2]))
+  if(length(data$Sample1)==0){  # If data is empty
+            matrix[k[1],k[2]] <- empty # 
+          }else if(type=="somalier"){  # If data is not empty
+            matrix[k[1],k[2]] <- data$relatedness  # Value in matrix = relatedness Somalier
+          }
+          else if(type=="tribes"){
+            matrix[k[1],k[2]] <- data$TRIBES_cM  # Value in matrix = centimorgan Tribes
+          }
+  if(names[1]==names[2]){   # If the sample names are the same  
+    matrix[k[1], k[2]] <- same}  # Value = 0
+  }
+return(matrix)
+}
+
+# Fill matrices for Somalier and Tribes
+somalier_matrix <- fill_matrix(somalier_matrix, somalier,"somalier", 0, 1)
+tribes_matrix <- fill_matrix(tribes_matrix, tribes,"tribes",  1, 0 )
+```
+
+<!-- Get lower part of matrix of Somalier and Tribes matrices -->
+```{r}
+# Get only the lower part of the matrix
+get_lower_tri<-function(matrix){
+    matrix[lower.tri(matrix)] <- NA
+    return(matrix)
+}
+
+# Get lower part of the matrix for Somalier and Tribes
+somalier_matrix <- get_lower_tri(somalier_matrix)
+tribes_matrix <- get_lower_tri(tribes_matrix)
+```
+
+<!-- Create colored matrices for Somalier and Tribes -->
+```{r}
+# Create the colored matrix
+make_heatmap <- function(matrix, low_color, high_color, method){
+  data <- melt(matrix, na.rm = TRUE)
+ggheatmap <- ggplot(data, aes(Var2, Var1, fill = value))+ geom_tile(color = "white") +
+ scale_fill_gradient2(low = low_color, high = high_color, mid = "orange", 
+   midpoint = 0.5, limit = c(-0.2,1), space = "Lab", name=method) +
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, size = 9, hjust = 1))+
+ coord_fixed() # Use to make sure legend can be displayed at right side
+# Add numbers to the matrix
++ geom_text(aes(Var2, Var1, label = format(round(value, 3), nsmall = 3)), color = "black", size = 3) +  
+  theme(
+  axis.title.x = element_blank(), # Do not show x as title
+  axis.title.y = element_blank(), # Do not show y as title
+  panel.background = element_blank(),  # Do not show grid
+  axis.ticks = element_blank(), # Do not show line
+  legend.position = c(1.1, 0.5), # Change position legend
+  legend.direction = "vertical")+
+  # Aanpassen grootte van de kleurenbalk en de grootte van de titel
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 5,
+                title.position = "top", title.hjust = 0.5)
+         )
+return(ggheatmap)
+}
+
+print(make_heatmap(somalier_matrix, "red", "green", "Somalier"))
+print(make_heatmap(tribes_matrix, "green", "red", "Tribes"))
+```
+
+```{r}
+purl("test_samples.Rmd")
+```
+
