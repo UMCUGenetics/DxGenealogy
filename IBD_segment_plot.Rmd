@@ -1,0 +1,90 @@
+---
+title: "IBD"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: scroll
+
+---
+
+<!-- Code Chunk voor de setup -->
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+library(flexdashboard)
+library(plotly)
+options(stringsAsFactors = F) 
+```
+
+<!-- Code Chunk voor de berekeningen -->
+```{r, echo=FALSE, include=FALSE}
+### Prepare plot
+args <- commandArgs(TRUE)    
+file <- read.table(args[1], sep="\t") # Read file
+file <- file[, c(1,3,5,6,7)]   # Keep only interesting columns
+colnames(file) <- c("Sample1", "Sample2", "Chromosome", 
+                    "Start", "End")   # Set column names
+start = 118869461   
+end = 118881893
+# Keep only entries that have the same or lower startpoint than variable start
+# and the endpoint is higher than variable end
+entries = file[file$Start <= start & 
+                 file$End >= end, ] 
+chr6 <- subset(entries, Chromosome == 6, 
+               select=Sample1:End)   # Store only entries with chromosome 6
+
+# Keep only unique values
+samples <- unique(chr6[c("Sample1")])
+samples <- as.vector(t(samples))
+samples
+samples_2 <- unique(chr6[c("Sample2")])
+samples_2
+samples_2 <- as.vector(t(samples_2))
+merge <- c(samples, samples_2)
+
+
+# Get smallest IBD segment
+smallest_start <- max(entries[,4]) 
+smallest_end <- min(entries[,5]) 
+smallest_start
+smallest_end
+
+# Code voor de plot ------------------------
+# Order the plot
+entries = entries[order(entries$Start, decreasing = T),]
+options(scipen=10000)   # Use to remove the scientific notation on x as 
+p1 <- ggplot(data = entries) + 
+  # Set the y limit
+  ylim(0, nrow(entries)) + 
+  # Set the x limit
+  xlim(c(min(entries[,4]), 
+         max(entries[,5]))) +
+  # Plot the segments
+  geom_segment(aes(x=Start, xend=End, 
+                   y=1:nrow(entries), yend=1:nrow(entries)))
+p1 <- p1 + 
+  theme(axis.text.y=element_blank(),
+                 axis.ticks.y=element_blank())   
+# Make line to indicate pln gene
+p1 <- p1 + 
+  geom_vline(xintercept=smallest_start, 
+                      color="red") + 
+  geom_vline(xintercept=smallest_end, 
+             color="red") + 
+  ggtitle("IBD shared segments for PLN") + 
+  xlab("Position") + 
+  ylab("")
+```
+
+Analyse
+=========================
+
+### Plot
+
+<!-- Code Chunk om te plotten -->
+```{r, echo=FALSE}
+### print plot
+ggplotly(p1)
+
+```
