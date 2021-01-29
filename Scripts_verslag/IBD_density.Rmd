@@ -1,0 +1,242 @@
+---
+title: "IBD"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: scroll
+---
+<!-- Load necessary packages -->
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)  # For plotting
+library(dplyr)  # For plotting
+library(hash)
+library(plotly)   # For plotting
+library(grid)
+library(gridExtra)
+library(flexdashboard)
+library(gtools)
+```
+
+```{r, include=FALSE}
+# Here are the global variables
+# Setting start and end position of PLN gene. 
+start = 118869461   
+end = 118881893
+lengte <- 5000
+start_frame <- 0
+end_frame <- lengte
+count <- c()
+x_pos <- c()
+end_chr <- c(249250621, 243199373, 198022430, 191154276, 180915260, 171115067, 159138663, 
+               146364022, 141213431, 135534747, 135006516, 133851895, 115169878, 107349540,
+               102531392, 90354753, 81195210, 78077248, 59128983, 63025520, 48129895, 
+               51304566)
+```
+
+
+<!-- Read Somalier and Tribes file-->
+```{r, include=FALSE}
+args <- commandArgs(TRUE)   
+read_file <- function(file)
+  # This function reads a file.
+  # The columns are stored and the numeric values are stored as numeric.
+  # The function returns a dataframe.
+  {
+    file <- read.table(file, sep="\t") # Read file
+    file <- file[,c(1,3,5,6,7)]   # Keep only interesting columns
+    colnames(file) <- c("Sample1","Sample2",
+                        "Chromosome", "Start", "End")   # Set column names
+    file <- transform(file, 
+                      Chromosome=as.numeric(Chromosome))  # Make Chromosome a numeric colomn.
+    file <- transform(file, 
+                      Start=as.numeric(Start) ) # Make Chromosome a numeric colomn.
+    file <- transform(file, 
+                      End=as.numeric(End))  # Make Chromosome a numeric colomn.   
+    return(file)
+}
+
+pln_file <- read_file(args[1])
+reference_file <- read_file(args[2])
+```
+
+<!-- Get total amount of pairing possibilities -->
+```{r}
+get_possibilities <- function(file)
+  # This function keeps only the unique values from column 1 and 2.
+  # Two vectors are made for each column. 
+  # The unique values are stored in a vector.
+  # The vector with the unique values is returned.
+  {
+    samples <- unique(c(file$Sample1)) # Only keep unique values of column Sample1
+    samples <- as.vector(t(samples))  # Make variable a vector
+    samples
+    samples_2 <- unique(c(file$Sample2)) # Only keep unique values of column Sample2
+    samples_2
+    samples_2 <- as.vector(t(samples_2))  # Make variable a vector
+    merge <- c(samples, samples_2)  # Merge the 2 vectors
+    samples <- unique(merge) # Keep only unique values
+    entries <- length(samples)
+    # Get total combinations from the samples with length "entries" and pick 2 per combination.
+    possibilities <- nrow(permutations(n=entries, r=2, 
+                                       v=samples, repeats.allowed=T))
+    return(possibilities)
+  }
+
+# Get possibilities for samples and reference samples
+pln_possibilities <- get_possibilities(pln_file)
+reference_possibilities <- get_possibilities(reference_file)
+```
+
+<!-- Get columns to calculate the density -->
+```{r, include=FALSE}
+density <- function(file)
+  # This function creates a subset of the dataframe.
+  # A dataframe is made with only the Chromosome number, start and end position.
+  # The created dataframe is returned.
+  {
+  segments <- subset(file, select=Chromosome:End)  
+  # Order the dataframe
+  segments <- segments[order(segments$Chromosome, 
+                             segments$Start), ]
+  return(segments)
+  }
+
+# Get denisty for samples and reference samples
+pln_density <- density(pln_file)
+reference_density <- density(reference_file)
+```
+
+<!-- Count the shared IBD segments found -->
+```{r,include=FALSE}
+found <- function(start, start_frame, end, end_frame, possibilities)
+  # This function calculates how many times a fragment is found,
+  # in a certain frame. 
+  # The function returns the result.
+  {
+    found_in_frame <- 0 
+    # Add to variable if "start" if same or higher than given the start frame and 
+    # if the "end" is lower or the same as the given end frame.
+    found_in_frame <- found_in_frame + 
+      sum(start >= start_frame & 
+            end <= end_frame)
+    # Add to variable if "start" if smaller or higher than the given start frame and 
+    # if the "end" is higheer or the same as the given end frame.
+    found_in_frame <- found_in_frame + 
+      sum(start <= start_frame & 
+            end >= end_frame)
+     # Add to variable if "start" if lower than the given start frame and 
+    # if the "end" is lower or the same as the given end frame.
+    found_in_frame <- found_in_frame + 
+      sum(start < start_frame & 
+            end > start_frame & 
+            end < end_frame)
+    # Add to variable if "start" if same or higher than the given start frame and 
+    # if the "end" is lower or the same as the given end frame and 
+    # if the "end" is higher than the given end frame.
+    found_in_frame <- found_in_frame + 
+      sum(start > start_frame & 
+            end < end_frame & 
+            end > end_frame)
+    # Divide total found by total possibilities
+    found_in_frame <- found_in_frame / possibilities
+    return (found_in_frame)
+} 
+
+chromosomes <- function(file, x, start_frame, end_frame, end, possibilities)
+  # This function calls the function "found". 
+  # The results of the function "found" are added to the vector "count".
+  # The function increases the size of the start_frame and the end_frame.
+  # The result is a list of 2 vectors.
+  # The first vector is of the total IBD found.
+  # The second vector are the corresponding start positions.
+  {
+  chr <- file[file$Chromosome==x,]
+  while(end_frame < end+(lengte-1)){
+    found <- found(chr$Start, start_frame, chr$End, end_frame, possibilities)
+    count <- c(count,found)
+  x_pos <- c(x_pos, start_frame)
+  start_frame <- end_frame + 1
+  end_frame <- end_frame + lengte
+  }
+  output <- list(counter= count, x_positie= x_pos)
+  return(output)
+}
+```
+
+
+
+```{r}
+# Create interactive plot for chromosome 6.
+ reference_chr <- chromosomes(reference_density, 6, start_frame,
+                            end_frame, end_chr[6], reference_possibilities)
+  pln_chr<-chromosomes(pln_density, 6, start_frame, 
+                       end_frame, end_chr[6], pln_possibilities)
+  options(scipen=10000)   # Use to remove the scientific notation on x as 
+  title <- paste("Chromosome", as.character(6))
+   plot <- ggplot() +
+   geom_line(aes(color="PLN Samples", 
+                   x=pln_chr$x_positie, 
+                   y=c(pln_chr$counter))) +
+   geom_line(aes(color="Reference samples", 
+                   x=reference_chr$x_positie, 
+                   y=c(reference_chr$counter))) +
+   ggtitle(title) +
+   xlim(0,250000000) +
+   ylim(0,0.25) +
+   labs(x="Position", y="Amount of IBD segments") +
+   scale_color_manual(values = c("red","blue")) 
+  ggplotly(plot)
+```
+
+
+```{r}
+# Create interactive plot for chromosome 15.
+ reference_chr <- chromosomes(reference_density, 15, start_frame,
+                            end_frame, end_chr[15], reference_possibilities)
+  pln_chr<-chromosomes(pln_density, 15, start_frame, 
+                       end_frame, end_chr[15], pln_possibilities)
+  options(scipen=10000)   # Use to remove the scientific notation on x as 
+  title <- paste("Chromosome", as.character(15))
+   plot <- ggplot() +
+   geom_line(aes(color="PLN Samples", 
+                   x=pln_chr$x_positie, 
+                   y=c(pln_chr$counter))) +
+   geom_line(aes(color="Reference samples", 
+                   x=reference_chr$x_positie, 
+                   y=c(reference_chr$counter))) +
+   ggtitle(title) +
+   xlim(0,250000000) +
+   ylim(0,0.25) +
+   labs(x="Position", y="Amount of IBD segments") +
+   scale_color_manual(values = c("red","blue")) 
+  ggplotly(plot)
+```
+```{r}
+plot_list <- lapply(1:22, function(i)
+  # This function creates plots for each chromosome.
+  {
+    # Get total IBD segments per position for reference data.
+    reference_chr <- chromosomes(reference_density, i,start_frame, 
+                               end_frame, end_chr[i], reference_possibilities)
+    # Get total IBD segments per position for pln data.
+    pln_chr <- chromosomes(pln_density, i,start_frame, 
+                         end_frame, end_chr[i], pln_possibilities)
+    options(scipen=10000)   # Use to remove the scientific notation on x as 
+    title <- paste("chromosoom", as.character(i))
+    plot <- ggplot() +
+    geom_line(color="red",aes_string
+                                 (x=pln_chr$x_positie, 
+                                   y=c(pln_chr$counter))) +
+    geom_line(color="blue",aes_string
+               (x=reference_chr$x_positie,
+                 y=c(reference_chr$counter))) +
+    ggtitle(title) +
+    xlim(0,250000000) +
+    ylim(0,0.25) +
+    theme(text=element_text(size=5)) +
+    labs(x="Positie", y="Aantal IBD segmenten")
+    print(plot)
+})
+```
+
+

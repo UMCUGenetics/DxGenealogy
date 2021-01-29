@@ -1,0 +1,157 @@
+---
+title: "dendogram"
+output:
+  
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+#knitr::purl()
+
+knit_hooks$set(purl = hook_purl)
+#tinytex::install_tinytex() to create the pdf
+#install.packages("igraph")
+library(igraph)
+library(ggplot2)
+```
+# Cluster the data
+
+### Reading TRIBES file
+```{r}
+TRIBES <- read.csv("/Users/nscheffe/Documents/git/DxGenealogy/Granulosa_haaften_TRIBES.csv", header=TRUE)
+TRIBES <- TRIBES[,c(1,2,3,6)] # Only keep necessary columns
+colnames(TRIBES) <- c("Sample1", "Sample2", "cM_TRIBES", "EstDegree_TRIBES")  # Add column names
+TRIBES$EstDegree_TRIBES[TRIBES$EstDegree_TRIBES=="PO"] <- 1   # Change character value to a number
+TRIBES
+write.table(TRIBES, "TRIBES.tsv", sep = "\t", row.names = FALSE)  # Write table to file
+```
+
+### Reading Somalier file
+```{r}
+Somalier <- read.table("/Users/nscheffe/Documents/git/DxGenealogy/Granulosa_haaften_somalier.tsv", sep="\t")
+Somalier <- Somalier[,1:3]  # Only keep necessary columns
+colnames(Somalier) <- c("Sample1", "Sample2", "Relatedness_somalier") # Change colnames
+Somalier
+```
+```{r}
+merged <- merge(Somalier, TRIBES, by=c("Sample1","Sample2"), all.x = TRUE )   # Merge the somalier and TRIBES frame
+merged <- transform(merged, EstDegree_TRIBES = as.numeric(EstDegree_TRIBES))  # Make Est_degree a numeric colomn.
+merged["EstDegree_TRIBES"][is.na(merged["EstDegree_TRIBES"])] <- 12     # If value is NA in TRIBES column, make value 12
+merged["cM_TRIBES"][is.na(merged["cM_TRIBES"])] <- 1 
+merged
+write.table(merged, "merged.tsv", sep = "\t", row.names = FALSE)  # Write frame to file
+```
+```{r}
+samples <- c()   # Create samples vector
+for(i in merged$Sample1){   # For entry in column Sample 1
+    if(! i %in% samples){   # if entry not in the vector:
+    samples <- c(samples, i)}   # Add entry to vector
+  }
+samples <- c(samples, "GPCA041B1")  # Add GPCA041B1 to vector (because it is only found in Sample2)
+samples
+```
+```{r}
+matrix2 <- matrix(1:64, nrow = 8, ncol = 8) # Create matrix 8x8
+matrix2
+```
+```{r}
+colnames(matrix2) <- samples  # Change columnnames with entries from samples vector
+rownames(matrix2) <- samples  # Change rownames with entries from samples vector
+matrix2 
+```
+```{r}
+for(i in matrix2){  #For every entry in the matrix
+k <- arrayInd(i, dim(matrix2))  # Get location of row and column of entry
+names <- mapply(`[[`, dimnames(matrix2), k)   # Get col & rownames at location k
+# Create subset where samples correspond with samples in the merged frame
+data <- subset(merged, (Sample1==names[1] & Sample2 ==names[2]) | 
+                 (Sample2==names[1] & Sample1 == names[2]))   
+if(length(data$Sample1)==0){  # If no match is found
+          matrix2[k[1],k[2]] <- 12
+        }else{
+          matrix2[k[1],k[2]] <- data$EstDegree_TRIBES   # If match found add value
+        }
+if(names[1]==names[2]){   # If the names are the same
+          matrix2[k[1], k[2]] <- 0}   # Degree becomes 0
+}
+```
+```{r}
+print(matrix2)
+```
+```{r}
+print(dist(matrix2), method="average")
+avg <- (hclust(dist(matrix2), method="average"))  # Create distance matrix
+```
+```{r}
+?as.dendrogram
+plot(as.dendrogram(avg), edgePar=list(col=1, lwd=3), horiz=F)   # Plot dendogram
+```
+```{r}
+matrix <- matrix(1:64, nrow = 8, ncol = 8)
+matrix
+colnames(matrix) <- samples
+rownames(matrix) <- samples
+matrix
+```
+
+
+```{r}
+for(i in matrix){
+k <- arrayInd(i, dim(matrix))
+#print(i)
+names <- mapply(`[[`, dimnames(matrix), k)
+data <- subset(merged, (Sample1==names[1] & Sample2 ==names[2]) | (Sample2==names[1] & Sample1 == names[2]))
+if(length(data$Sample1)==0){
+          matrix[k[1],k[2]] <- 1
+        }else{
+          matrix[k[1],k[2]] <- data$cM_TRIBES
+        }
+if(names[1]==names[2]){
+          matrix[k[1], k[2]] <- 0}
+}
+```
+
+
+```{r}
+print(dist(matrix), method="average")
+avg_cM <- (hclust(dist(matrix), method="average"))
+```
+
+```{r}
+?as.dendrogram
+plot(as.dendrogram(avg_cM), edgePar=list(col=1, lwd=3), horiz=F) 
+```
+```{r}
+print(dist(matrix), method="average")
+avg_cM <- (hclust(dist(matrix, method="euclidean"), method="average"))
+plot(as.dendrogram(avg_cM), edgePar=list(col=1, lwd=3), horiz=F) 
+```
+```{r}
+print(dist(matrix), method="average")
+avg_cM <- (hclust(dist(matrix, method="manhattan"), method="average"))
+plot(as.dendrogram(avg_cM), edgePar=list(col=1, lwd=3), horiz=F) 
+```
+
+
+
+```{r}
+g <- graph.edgelist(as.matrix(merged[,1:2]), directed=FALSE)
+plot(g, edge.width = (1- merged$cM_TRIBES)*5, edge.label=ifelse(format(round((1-merged$cM_TRIBES)*5), nsmall = 0) > 0, format(round((1-merged$cM_TRIBES)), nsmall = 6), NA))
+
+```
+```{r}
+merged
+merged["1-cM"]<- 1 - merged$cM_TRIBES 
+merged
+```
+```{r}
+sub <- subset(merged, select = c(Sample1, Sample2, cM_TRIBES, `1-cM`))
+sub
+purl("dendogram.Rmd")
+```
+
+
+edge.label=format(round((1-merged$cM_TRIBES)*5), nsmall = 1)
+, edge.label=format(round((1-merged$cM_TRIBES)*5), nsmall = 0)
+edge.width = (1-merged$cM_TRIBES)*5)
+format(round((1-merged$cM_TRIBES)*5), nsmall = 0))
