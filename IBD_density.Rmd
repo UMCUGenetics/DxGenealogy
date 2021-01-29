@@ -36,7 +36,7 @@ end_chr <- c(249250621, 243199373, 198022430, 191154276, 180915260, 171115067, 1
 
 <!-- Read Somalier and Tribes file-->
 ```{r, include=FALSE}
-#args<-commandArgs(TRUE)    # Use when script is finished
+args <- commandArgs(TRUE)   
 read_file <- function(file)
   # This function reads a file.
   # The columns are stored and the numeric values are stored as numeric.
@@ -55,8 +55,8 @@ read_file <- function(file)
     return(file)
 }
 
-pln_file <- read_file("pln.match")
-reference_file <- read_file("granulosa.match")
+pln_file <- read_file(args[1])
+reference_file <- read_file(args[2])
 ```
 
 <!-- Get total amount of pairing possibilities -->
@@ -216,10 +216,10 @@ plot_list <- lapply(1:22, function(i)
   # This function creates plots for each chromosome.
   {
     # Get total IBD segments per position for reference data.
-    reference_chr<-chromosomes(reference_density, i,start_frame, 
+    reference_chr <- chromosomes(reference_density, i,start_frame, 
                                end_frame, end_chr[i], reference_possibilities)
     # Get total IBD segments per position for pln data.
-    pln_chr<-chromosomes(pln_density, i,start_frame, 
+    pln_chr <- chromosomes(pln_density, i,start_frame, 
                          end_frame, end_chr[i], pln_possibilities)
     options(scipen=10000)   # Use to remove the scientific notation on x as 
     title <- paste("chromosoom", as.character(i))
@@ -228,7 +228,7 @@ plot_list <- lapply(1:22, function(i)
                                  (x=pln_chr$x_positie, 
                                    y=c(pln_chr$counter))) +
     geom_line(color="blue",aes_string
-               (x = reference_chr$x_positie,
+               (x=reference_chr$x_positie,
                  y=c(reference_chr$counter))) +
     ggtitle(title) +
     xlim(0,250000000) +
